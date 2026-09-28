@@ -1,0 +1,7 @@
+{
+  "system": "nwu-data-monetization",
+  "tier": "PARKED",
+  "reason": "stub; liquidity-bond language is not a live product",
+  "cash_rail": "https://buy.stripe.com/3cI00j7YV0hQgDp8BR43S2v",
+  "stamped_by": "garcar-repo-foundry"
+}
