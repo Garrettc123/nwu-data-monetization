@@ -5,6 +5,8 @@ Provides endpoints for asset management and bond operations.
 
 from typing import Dict, List, Optional
 from datetime import datetime
+from math import isfinite
+from src.core.data_valuation import DataAsset, DataQuality
 
 
 class MonetizationAPI:
@@ -15,21 +17,66 @@ class MonetizationAPI:
         self.valuation_engine = valuation_engine
     
     def create_asset(self, asset_data: Dict) -> Dict:
-        """Create and register new data asset.
-        
-        Args:
-            asset_data: Asset configuration
-            
-        Returns:
-            Created asset information
+        """Validate and register a data asset in the in-memory valuation engine.
+
+        Registration is not marketplace listing, rights verification, payment,
+        bond issuance, or revenue realization.
         """
-        # Implementation placeholder
+        required = (
+            "asset_id", "name", "description", "data_type", "volume",
+            "quality", "uniqueness_score", "market_demand",
+        )
+        missing = [key for key in required if key not in asset_data]
+        if missing:
+            raise ValueError(f"Missing asset fields: {', '.join(missing)}")
+
+        asset_id = asset_data["asset_id"]
+        if not isinstance(asset_id, str) or not asset_id.strip():
+            raise ValueError("asset_id must be a nonempty string")
+        if asset_id in self.valuation_engine.assets:
+            raise ValueError(f"Asset already registered: {asset_id}")
+
+        for field in ("name", "description", "data_type"):
+            if not isinstance(asset_data[field], str) or not asset_data[field].strip():
+                raise ValueError(f"{field} must be a nonempty string")
+
+        volume = asset_data["volume"]
+        if isinstance(volume, bool) or not isinstance(volume, int) or volume <= 0:
+            raise ValueError("volume must be a positive integer")
+
+        quality = asset_data["quality"]
+        if isinstance(quality, str):
+            try:
+                quality = DataQuality[quality.upper()]
+            except KeyError as exc:
+                raise ValueError("quality must be LOW, MEDIUM, HIGH or PREMIUM") from exc
+        if not isinstance(quality, DataQuality):
+            raise ValueError("quality must be a DataQuality value or name")
+
+        for field in ("uniqueness_score", "market_demand"):
+            value = asset_data[field]
+            if isinstance(value, bool) or not isinstance(value, (float, int)):
+                raise ValueError(f"{field} must be between 0 and 1")
+            if not isfinite(value) or not 0 <= value <= 1:
+                raise ValueError(f"{field} must be between 0 and 1")
+
+        asset = DataAsset(
+            asset_id=asset_id,
+            name=asset_data["name"],
+            description=asset_data["description"],
+            data_type=asset_data["data_type"],
+            volume=volume,
+            quality=quality,
+            uniqueness_score=float(asset_data["uniqueness_score"]),
+            market_demand=float(asset_data["market_demand"]),
+        )
+        self.valuation_engine.register_asset(asset)
         return {
             "status": "success",
-            "asset_id": asset_data.get("asset_id"),
-            "message": "Asset registered for monetization"
+            "asset_id": asset_id,
+            "message": "Asset registered in valuation engine; not listed, sold or verified",
         }
-    
+
     def issue_bond(self, bond_params: Dict) -> Dict:
         """Issue new liquidity bond for data asset.
         
